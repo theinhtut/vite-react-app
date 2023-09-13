@@ -1,0 +1,15 @@
+Dockerfile
+.dockerignore
+.prettierrc
+.nvmrc
+.eslintrc*
+docker-compose*
+coverage
+build
+dist
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn.lock*
+yarn-error.log*
+yarn.lock
