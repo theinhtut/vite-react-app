@@ -2,7 +2,11 @@ name: Build & Push Docker Image (CI)
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ['main']
+
+env:
+  REGISTRY: docker.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   build:
@@ -13,46 +17,75 @@ jobs:
         node-version: [18.x]
 
     steps:
-    - uses: actions/checkout@v3
-    - name: Add custom env variables
-      shell: bash
-      run: |
-        echo "git_hash_short=$(git rev-parse --short "$GITHUB_SHA")" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v3
+      - name: Add custom env variables
+        shell: bash
+        run: |
+          echo "git_hash_short=$(git rev-parse --short "$GITHUB_SHA")" >> "$GITHUB_ENV"
 
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v3
-      with:
-        node-version-file: '.nvmrc'
-        # node-version: ${{ matrix.node-version }}
-        cache: 'npm'
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version-file: '.nvmrc'
+          # node-version: ${{ matrix.node-version }}
+          cache: 'npm'
 
-    - name: Cache node_modules
-      id: cache-nodemodules
-      uses: actions/cache@v3
-      env:
-        cache-name: cache-node-modules
-      with:
-        # caching node_modules
-        path: node_modules
-        key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-build-${{ env.cache-name }}-
-          ${{ runner.os }}-build-
-          ${{ runner.os }}-
+      - name: Cache node_modules
+        id: cache-nodemodules
+        uses: actions/cache@v3
+        env:
+          cache-name: cache-node-modules
+        with:
+          # caching node_modules
+          path: node_modules
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-
+            ${{ runner.os }}-build-
+            ${{ runner.os }}-
 
-    - name: Install Node Dependencies
-      if: steps.cache-nodemodules.outputs.cache-hit != 'true'
-      run: |
-        npm ci --quiet
+      - name: Install Node dependencies
+        if: steps.cache-nodemodules.outputs.cache-hit != 'true'
+        run: |
+          npm ci --quiet
 
-    - name: Testing
-      run: |
-        npm run test
+      - name: Testing
+        run: |
+          npm run test
 
-    - name: Show latest commit hash
-      run: |
-        echo "git commit hash short: ${{ env.git_hash_short }}"
+      - name: Show latest commit hash
+        run: |
+          echo "git commit hash short: ${{ env.git_hash_short }}"
 
-    # - run: npm ci
-    # - run: npm run build --if-present
-    # - run: npm test
+      # - name: Build the Docker image
+      #   run: docker build --tag my-image-name:$(date +%s)
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,enable=true,priority=100,prefix=sha-,suffix=,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        id: build-and-push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
