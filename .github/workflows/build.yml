@@ -17,14 +17,15 @@ jobs:
     - name: Add custom env variables
       shell: bash
       run: |
-        echo "git_hash_short=$(git rev-parse --short "$GITHUB_SHA") >> "$GITHUB_ENV"
+        echo "git_hash_short=$(git rev-parse --short "$GITHUB_SHA")" >> "$GITHUB_ENV"
+
     - name: Use Node.js ${{ matrix.node-version }}
       uses: actions/setup-node@v3
       with:
         node-version-file: '.nvmrc'
         # node-version: ${{ matrix.node-version }}
         cache: 'npm'
-        
+
     - name: Cache node_modules
       id: cache-nodemodules
       uses: actions/cache@v3
@@ -51,7 +52,7 @@ jobs:
     - name: Show latest commit hash
       run: |
         echo "git commit hash short: ${{ env.git_hash_short }}"
-        
+
     # - run: npm ci
     # - run: npm run build --if-present
     # - run: npm test
